@@ -3,14 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JS Dr. Mario Clone</title>
+    <title>Dr. Mario Modern</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="game-container">
-        <div id="ui">Score: <span id="score">0</span></div>
-        <canvas id="gameCanvas" width="240" height="480"></canvas>
-        <div class="controls-hint">WASD or Arrows to Move/Rotate</div>
+    <div class="glass-container">
+        <div class="side-panel">
+            <div class="stat-card">
+                <label>SCORE</label>
+                <div id="score">000000</div>
+            </div>
+            <div class="stat-card">
+                <label>NEXT</label>
+                <canvas id="nextCanvas" width="80" height="40"></canvas>
+            </div>
+        </div>
+
+        <div class="canvas-wrapper">
+            <canvas id="gameCanvas" width="300" height="600"></canvas>
+        </div>
+
+        <div class="side-panel">
+            <div class="controls-card">
+                <label>CONTROLS</label>
+                <ul>
+                    <li><span>WASD</span> Move</li>
+                    <li><span>W / ↑</span> Rotate</li>
+                    <li><span>S / ↓</span> Drop</li>
+                </ul>
+            </div>
+        </div>
     </div>
     <script src="script.js"></script>
 </body>
