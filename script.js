@@ -1,167 +1,140 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const scoreElement = document.getElementById('score');
+const nextCanvas = document.getElementById('nextCanvas');
+const nextCtx = nextCanvas.getContext('2d');
 
-const ROWS = 16;
-const COLS = 8;
-const SIZE = 30;
-const COLORS = ['#FF0000', '#00FF00', '#0000FF']; // Red, Green, Blue
-
+const ROWS = 16, COLS = 8, SIZE = 30;
+const COLORS = ['#FF2D55', '#00FFDD', '#FFCC00']; // Modern Neon Palette
 let grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
 let score = 0;
 
-// Pill Object
+let nextPill = [COLORS[Math.floor(Math.random() * 3)], COLORS[Math.floor(Math.random() * 3)]];
+
 let pill = {
-    x: 3,
-    y: 0,
-    segments: [
-        { dx: 0, dy: 0, color: COLORS[Math.floor(Math.random() * 3)] },
-        { dx: 1, dy: 0, color: COLORS[Math.floor(Math.random() * 3)] }
-    ],
-    vertical: false
+    x: 3, y: 0,
+    rotation: 0, // 0: Horiz, 1: Vert, 2: Horiz(Rev), 3: Vert(Rev)
+    colors: []
 };
 
-function draw() {
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Draw Grid
-    grid.forEach((row, y) => {
-        row.forEach((color, x) => {
-            if (color) drawBlock(x, y, color);
-        });
-    });
-
-    // Draw Active Pill
-    pill.segments.forEach(s => {
-        drawBlock(pill.x + s.dx, pill.y + s.dy, s.color);
-    });
-}
-
-function drawBlock(x, y, color) {
-    ctx.fillStyle = color;
-    ctx.fillRect(x * SIZE, y * SIZE, SIZE - 2, SIZE - 2);
-    ctx.strokeStyle = '#fff';
-    ctx.strokeRect(x * SIZE, y * SIZE, SIZE - 2, SIZE - 2);
-}
-
-function movePill(dx, dy) {
-    if (!checkCollision(pill.x + dx, pill.y + dy, pill.segments)) {
-        pill.x += dx;
-        pill.y += dy;
-        return true;
-    }
-    if (dy > 0) lockPill();
-    return false;
-}
-
-function rotatePill() {
-    let nextSegments;
-    if (pill.vertical) {
-        nextSegments = [{ dx: 0, dy: 0, color: pill.segments[0].color }, { dx: 1, dy: 0, color: pill.segments[1].color }];
-    } else {
-        nextSegments = [{ dx: 0, dy: 0, color: pill.segments[0].color }, { dx: 0, dy: -1, color: pill.segments[1].color }];
-    }
-
-    if (!checkCollision(pill.x, pill.y, nextSegments)) {
-        pill.segments = nextSegments;
-        pill.vertical = !pill.vertical;
+function spawnPill() {
+    pill.x = 3; pill.y = 1; pill.rotation = 0;
+    pill.colors = [...nextPill];
+    nextPill = [COLORS[Math.floor(Math.random() * 3)], COLORS[Math.floor(Math.random() * 3)]];
+    drawNext();
+    
+    if (checkCollision(pill.x, pill.y, pill.rotation)) {
+        alert("GAME OVER");
+        grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+        score = 0;
     }
 }
 
-function checkCollision(nx, ny, segments) {
-    return segments.some(s => {
-        let tx = nx + s.dx;
-        let ty = ny + s.dy;
-        return tx < 0 || tx >= COLS || ty >= ROWS || (ty >= 0 && grid[ty][tx]);
+function getSegments(x, y, rotation) {
+    // Defines where the second half of the pill is based on rotation
+    const offsets = [{dx: 1, dy: 0}, {dx: 0, dy: -1}, {dx: -1, dy: 0}, {dx: 0, dy: 1}];
+    return [
+        {x: x, y: y, color: pill.colors[0]},
+        {x: x + offsets[rotation].dx, y: y + offsets[rotation].dy, color: pill.colors[1]}
+    ];
+}
+
+function checkCollision(nx, ny, nr) {
+    return getSegments(nx, ny, nr).some(s => {
+        return s.x < 0 || s.x >= COLS || s.y >= ROWS || (s.y >= 0 && grid[s.y][s.x]);
     });
 }
 
-function lockPill() {
-    pill.segments.forEach(s => {
-        if (pill.y + s.dy >= 0) {
-            grid[pill.y + s.dy][pill.x + s.dx] = s.color;
-        }
+function tryRotate() {
+    let nextRot = (pill.rotation + 1) % 4;
+    // Standard rotation
+    if (!checkCollision(pill.x, pill.y, nextRot)) {
+        pill.rotation = nextRot;
+    } 
+    // Wall Kick: Try moving left or right if against a wall
+    else if (!checkCollision(pill.x - 1, pill.y, nextRot)) {
+        pill.x -= 1; pill.rotation = nextRot;
+    } 
+    else if (!checkCollision(pill.x + 1, pill.y, nextRot)) {
+        pill.x += 1; pill.rotation = nextRot;
+    }
+}
+
+function lock() {
+    getSegments(pill.x, pill.y, pill.rotation).forEach(s => {
+        if (s.y >= 0) grid[s.y][s.x] = s.color;
     });
     clearMatches();
     spawnPill();
 }
 
-function spawnPill() {
-    pill = {
-        x: 3, y: 0,
-        segments: [
-            { dx: 0, dy: 0, color: COLORS[Math.floor(Math.random() * 3)] },
-            { dx: 1, dy: 0, color: COLORS[Math.floor(Math.random() * 3)] }
-        ],
-        vertical: false
-    };
-    if (checkCollision(pill.x, pill.y, pill.segments)) {
-        alert("Game Over! Score: " + score);
-        grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
-        score = 0;
-        scoreElement.innerText = score;
-    }
-}
-
 function clearMatches() {
     let toClear = new Set();
-
-    // Horizontal check
-    for (let y = 0; y < ROWS; y++) {
-        for (let x = 0; x < COLS - 3; x++) {
-            let color = grid[y][x];
-            if (color && grid[y][x+1] === color && grid[y][x+2] === color && grid[y][x+3] === color) {
-                [0,1,2,3].forEach(i => toClear.add(`${y},${x+i}`));
-            }
+    // Horizontal & Vertical Match 4 Logic
+    for(let y=0; y<ROWS; y++) {
+        for(let x=0; x<COLS; x++) {
+            let c = grid[y][x];
+            if(!c) continue;
+            if(x<COLS-3 && [1,2,3].every(i => grid[y][x+i] === c)) [0,1,2,3].forEach(i => toClear.add(`${y},${x+i}`));
+            if(y<ROWS-3 && [1,2,3].every(i => grid[y+i][x] === c)) [0,1,2,3].forEach(i => toClear.add(`${y+i},${x}`));
         }
     }
-
-    // Vertical check
-    for (let x = 0; x < COLS; x++) {
-        for (let y = 0; y < ROWS - 3; y++) {
-            let color = grid[y][x];
-            if (color && grid[y+1][x] === color && grid[y+2][x] === color && grid[y+3][x] === color) {
-                [0,1,2,3].forEach(i => toClear.add(`${y+i},${x}`));
-            }
-        }
-    }
-
+    toClear.forEach(pos => { let [y,x] = pos.split(',').map(Number); grid[y][x] = null; });
     if (toClear.size > 0) {
-        toClear.forEach(pos => {
-            let [y, x] = pos.split(',').map(Number);
-            grid[y][x] = null;
-        });
         score += toClear.size * 10;
-        scoreElement.innerText = score;
+        document.getElementById('score').innerText = score.toString().padStart(6, '0');
         applyGravity();
     }
 }
 
 function applyGravity() {
+    let changed = false;
     for (let x = 0; x < COLS; x++) {
         for (let y = ROWS - 1; y > 0; y--) {
             if (!grid[y][x] && grid[y-1][x]) {
                 grid[y][x] = grid[y-1][x];
                 grid[y-1][x] = null;
-                y = ROWS; // Re-check column
+                changed = true;
             }
         }
     }
+    if (changed) setTimeout(applyGravity, 100);
 }
 
-// Input Handling
+function drawBlock(x, y, color, targetCtx = ctx) {
+    const s = (targetCtx === ctx) ? SIZE : 20;
+    targetCtx.fillStyle = color;
+    targetCtx.beginPath();
+    targetCtx.roundRect(x * s + 2, y * s + 2, s - 4, s - 4, 8);
+    targetCtx.fill();
+    // Highlight effect
+    targetCtx.fillStyle = "rgba(255,255,255,0.3)";
+    targetCtx.fillRect(x * s + 6, y * s + 6, 4, 4);
+}
+
+function drawNext() {
+    nextCtx.clearRect(0, 0, 80, 40);
+    drawBlock(0.5, 0.5, nextPill[0], nextCtx);
+    drawBlock(1.5, 0.5, nextPill[1], nextCtx);
+}
+
+function update() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    grid.forEach((row, y) => row.forEach((col, x) => { if(col) drawBlock(x, y, col) }));
+    getSegments(pill.x, pill.y, pill.rotation).forEach(s => drawBlock(s.x, s.y, s.color));
+}
+
 window.addEventListener('keydown', e => {
-    if (e.key === 'ArrowLeft' || e.key === 'a') movePill(-1, 0);
-    if (e.key === 'ArrowRight' || e.key === 'd') movePill(1, 0);
-    if (e.key === 'ArrowDown' || e.key === 's') movePill(0, 1);
-    if (e.key === 'ArrowUp' || e.key === 'w') rotatePill();
+    if (['a', 'ArrowLeft'].includes(e.key) && !checkCollision(pill.x - 1, pill.y, pill.rotation)) pill.x--;
+    if (['d', 'ArrowRight'].includes(e.key) && !checkCollision(pill.x + 1, pill.y, pill.rotation)) pill.x++;
+    if (['s', 'ArrowDown'].includes(e.key) && !checkCollision(pill.x, pill.y + 1, pill.rotation)) pill.y++;
+    if (['w', 'ArrowUp', ' '].includes(e.key)) tryRotate();
+    update();
 });
 
-// Game Loop
 setInterval(() => {
-    movePill(0, 1);
-    draw();
+    if (!checkCollision(pill.x, pill.y + 1, pill.rotation)) pill.y++;
+    else lock();
+    update();
 }, 800);
 
-draw();
+spawnPill();
